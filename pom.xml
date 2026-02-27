@@ -35,6 +35,8 @@
 	<properties>
 		<java.version>17</java.version>
 		<spring-cloud.version>2024.0.0</spring-cloud.version>
+		<jacoco-maven-plugin.version>0.8.12</jacoco-maven-plugin.version>
+		<jacoco.coverage.exclusions>com/itau/srv/gerenciamento/clientes/exception/**,com/itau/srv/gerenciamento/clientes/model/**,com/itau/srv/gerenciamento/clientes/repository/**,com/itau/srv/gerenciamento/clientes/dto/**,com/itau/srv/gerenciamento/clientes/annotation/**,com/itau/srv/gerenciamento/clientes/GerenciamentoClientesApplication.class</jacoco.coverage.exclusions>
 	</properties>
 	<dependencyManagement>
 		<dependencies>
@@ -51,7 +53,7 @@
 		<dependency>
 			<groupId>com.itau</groupId>
 			<artifactId>common.library</artifactId>
-			<version>0.0.1</version>
+			<version>0.0.12</version>
 		</dependency>
 
 		<dependency>
@@ -121,6 +123,30 @@
 						</exclude>
 					</excludes>
 				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.jacoco</groupId>
+				<artifactId>jacoco-maven-plugin</artifactId>
+				<version>${jacoco-maven-plugin.version}</version>
+				<configuration>
+					<excludes>
+						<exclude>${jacoco.coverage.exclusions}</exclude>
+					</excludes>
+				</configuration>
+				<executions>
+					<execution>
+						<goals>
+							<goal>prepare-agent</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>report</id>
+						<phase>test</phase>
+						<goals>
+							<goal>report</goal>
+						</goals>
+					</execution>
+				</executions>
 			</plugin>
 		</plugins>
 	</build>
