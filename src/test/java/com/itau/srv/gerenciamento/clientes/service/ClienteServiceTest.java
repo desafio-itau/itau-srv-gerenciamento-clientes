@@ -1,5 +1,7 @@
 package com.itau.srv.gerenciamento.clientes.service;
 
+import com.itau.common.library.exception.RecursoNaoEncontradoException;
+import com.itau.srv.gerenciamento.clientes.dto.adesao.AdesaoCancelamentoResponseDTO;
 import com.itau.srv.gerenciamento.clientes.dto.adesao.AdesaoRequestDTO;
 import com.itau.srv.gerenciamento.clientes.dto.adesao.AdesaoResponseDTO;
 import com.itau.srv.gerenciamento.clientes.mapper.ClienteMapper;
@@ -201,5 +203,133 @@ class ClienteServiceTest {
         verify(clienteMapper, times(1)).mapearParaAdesaoResponseDTO(clienteSalvo, contaGrafica);
         assertNotNull(resultado);
     }
-}
 
+    // Testes de Cancelamento de Adesão
+
+    @Test
+    void deveCancelarAdesaoComSucesso() {
+        // Arrange
+        when(clienteRepository.findByIdAndAtivo(1L)).thenReturn(java.util.Optional.of(clienteSalvo));
+        when(clienteRepository.save(any(Cliente.class))).thenReturn(clienteSalvo);
+
+        // Act
+        AdesaoCancelamentoResponseDTO resultado = clienteService.cancelarAdesao(1L);
+
+        // Assert
+        assertNotNull(resultado);
+        assertEquals(1L, resultado.clienteId());
+        assertEquals("João Silva", resultado.nome());
+        assertFalse(resultado.ativo());
+        assertNotNull(resultado.dataSaida());
+        assertEquals("Adesão encerrada. Sua posição em custodia foi mantida.", resultado.mensagem());
+        verify(clienteRepository, times(1)).findByIdAndAtivo(1L);
+        verify(clienteRepository, times(1)).save(clienteSalvo);
+    }
+
+    @Test
+    void deveDefinirClienteComoInativoAoCancelar() {
+        // Arrange
+        when(clienteRepository.findByIdAndAtivo(1L)).thenReturn(java.util.Optional.of(clienteSalvo));
+        when(clienteRepository.save(any(Cliente.class))).thenAnswer(invocation -> {
+            Cliente c = invocation.getArgument(0);
+            assertFalse(c.getAtivo());
+            return c;
+        });
+
+        // Act
+        AdesaoCancelamentoResponseDTO resultado = clienteService.cancelarAdesao(1L);
+
+        // Assert
+        assertFalse(resultado.ativo());
+        verify(clienteRepository, times(1)).save(clienteSalvo);
+    }
+
+    @Test
+    void deveLancarExcecaoAoCancelarClienteInexistente() {
+        // Arrange
+        when(clienteRepository.findByIdAndAtivo(99999L)).thenReturn(java.util.Optional.empty());
+
+        // Act & Assert
+        RecursoNaoEncontradoException exception = assertThrows(
+                RecursoNaoEncontradoException.class,
+                () -> clienteService.cancelarAdesao(99999L)
+        );
+
+        assertEquals("CLIENTE_NAO_ENCONTRADO", exception.getMessage());
+        verify(clienteRepository, times(1)).findByIdAndAtivo(99999L);
+        verify(clienteRepository, never()).save(any(Cliente.class));
+    }
+
+    @Test
+    void deveLancarExcecaoAoCancelarClienteJaInativo() {
+        // Arrange
+        when(clienteRepository.findByIdAndAtivo(1L)).thenReturn(java.util.Optional.empty());
+
+        // Act & Assert
+        RecursoNaoEncontradoException exception = assertThrows(
+                RecursoNaoEncontradoException.class,
+                () -> clienteService.cancelarAdesao(1L)
+        );
+
+        assertEquals("CLIENTE_NAO_ENCONTRADO", exception.getMessage());
+    }
+
+    @Test
+    void deveRetornarDataCancelamentoCorreta() {
+        // Arrange
+        when(clienteRepository.findByIdAndAtivo(1L)).thenReturn(java.util.Optional.of(clienteSalvo));
+        when(clienteRepository.save(any(Cliente.class))).thenReturn(clienteSalvo);
+
+        // Act
+        AdesaoCancelamentoResponseDTO resultado = clienteService.cancelarAdesao(1L);
+
+        // Assert
+        assertNotNull(resultado.dataSaida());
+    }
+
+    @Test
+    void deveRetornarMensagemPadraoDeCancelamento() {
+        // Arrange
+        when(clienteRepository.findByIdAndAtivo(1L)).thenReturn(java.util.Optional.of(clienteSalvo));
+        when(clienteRepository.save(any(Cliente.class))).thenReturn(clienteSalvo);
+
+        // Act
+        AdesaoCancelamentoResponseDTO resultado = clienteService.cancelarAdesao(1L);
+
+        // Assert
+        assertNotNull(resultado.mensagem());
+        assertEquals("Adesão encerrada. Sua posição em custodia foi mantida.", resultado.mensagem());
+    }
+
+    @Test
+    void deveSalvarClienteInativoNoBancoDeDados() {
+        // Arrange
+        when(clienteRepository.findByIdAndAtivo(1L)).thenReturn(java.util.Optional.of(clienteSalvo));
+        when(clienteRepository.save(any(Cliente.class))).thenReturn(clienteSalvo);
+
+        // Act
+        clienteService.cancelarAdesao(1L);
+
+        // Assert
+        verify(clienteRepository, times(1)).save(clienteSalvo);
+    }
+
+    @Test
+    void deveChamarFindByIdAndAtivoComIdCorreto() {
+        // Arrange
+        Long clienteId = 5L;
+        Cliente clienteTeste = new Cliente();
+        clienteTeste.setId(clienteId);
+        clienteTeste.setNome("Teste");
+        clienteTeste.setAtivo(true);
+
+        when(clienteRepository.findByIdAndAtivo(clienteId)).thenReturn(java.util.Optional.of(clienteTeste));
+        when(clienteRepository.save(any(Cliente.class))).thenReturn(clienteTeste);
+
+        // Act
+        clienteService.cancelarAdesao(clienteId);
+
+        // Assert
+        verify(clienteRepository, times(1)).findByIdAndAtivo(clienteId);
+    }
+}

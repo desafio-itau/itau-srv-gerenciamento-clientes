@@ -1,6 +1,7 @@
 package com.itau.srv.gerenciamento.clientes.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.itau.srv.gerenciamento.clientes.dto.adesao.AdesaoCancelamentoResponseDTO;
 import com.itau.srv.gerenciamento.clientes.dto.adesao.AdesaoRequestDTO;
 import com.itau.srv.gerenciamento.clientes.dto.adesao.AdesaoResponseDTO;
 import com.itau.srv.gerenciamento.clientes.dto.contagrafica.ContaGraficaResponseDTO;
@@ -188,5 +189,164 @@ class ClientesControllerTest {
                         .content(jsonRequest))
                 .andExpect(status().isCreated());
     }
-}
 
+    // Testes de Cancelamento de Adesão
+
+    @Test
+    void deveCancelarAdesaoComSucesso() throws Exception {
+        // Arrange
+        Long clienteId = 1L;
+        AdesaoCancelamentoResponseDTO cancelamentoResponse = new AdesaoCancelamentoResponseDTO(
+                clienteId,
+                "João Silva",
+                false,
+                LocalDateTime.now(),
+                "Adesão encerrada. Sua posição em custodia foi mantida."
+        );
+
+        when(clienteService.cancelarAdesao(clienteId)).thenReturn(cancelamentoResponse);
+
+        // Act & Assert
+        mockMvc.perform(post("/api/clientes/" + clienteId + "/saida")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.clienteId").value(clienteId))
+                .andExpect(jsonPath("$.nome").value("João Silva"))
+                .andExpect(jsonPath("$.ativo").value(false))
+                .andExpect(jsonPath("$.dataSaida").exists())
+                .andExpect(jsonPath("$.mensagem").value("Adesão encerrada. Sua posição em custodia foi mantida."));
+
+        verify(clienteService, times(1)).cancelarAdesao(clienteId);
+    }
+
+    @Test
+    void deveRetornarStatus200QuandoCancelamentoComSucesso() throws Exception {
+        // Arrange
+        Long clienteId = 1L;
+        AdesaoCancelamentoResponseDTO cancelamentoResponse = new AdesaoCancelamentoResponseDTO(
+                clienteId,
+                "João Silva",
+                false,
+                LocalDateTime.now(),
+                "Adesão encerrada. Sua posição em custodia foi mantida."
+        );
+
+        when(clienteService.cancelarAdesao(clienteId)).thenReturn(cancelamentoResponse);
+
+        // Act & Assert
+        mockMvc.perform(post("/api/clientes/" + clienteId + "/saida")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void deveRetornarDadosDoCancelamentoNaResposta() throws Exception {
+        // Arrange
+        Long clienteId = 1L;
+        AdesaoCancelamentoResponseDTO cancelamentoResponse = new AdesaoCancelamentoResponseDTO(
+                clienteId,
+                "João Silva",
+                false,
+                LocalDateTime.now(),
+                "Adesão encerrada. Sua posição em custodia foi mantida."
+        );
+
+        when(clienteService.cancelarAdesao(clienteId)).thenReturn(cancelamentoResponse);
+
+        // Act & Assert
+        mockMvc.perform(post("/api/clientes/" + clienteId + "/saida")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.clienteId").exists())
+                .andExpect(jsonPath("$.nome").exists())
+                .andExpect(jsonPath("$.ativo").exists())
+                .andExpect(jsonPath("$.dataSaida").exists())
+                .andExpect(jsonPath("$.mensagem").exists());
+    }
+
+    @Test
+    void deveRetornarAtivoFalsoAposCancelamento() throws Exception {
+        // Arrange
+        Long clienteId = 1L;
+        AdesaoCancelamentoResponseDTO cancelamentoResponse = new AdesaoCancelamentoResponseDTO(
+                clienteId,
+                "João Silva",
+                false,
+                LocalDateTime.now(),
+                "Adesão encerrada. Sua posição em custodia foi mantida."
+        );
+
+        when(clienteService.cancelarAdesao(clienteId)).thenReturn(cancelamentoResponse);
+
+        // Act & Assert
+        mockMvc.perform(post("/api/clientes/" + clienteId + "/saida")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ativo").value(false));
+    }
+
+    @Test
+    void deveChamarServiceParaCancelar() throws Exception {
+        // Arrange
+        Long clienteId = 1L;
+        AdesaoCancelamentoResponseDTO cancelamentoResponse = new AdesaoCancelamentoResponseDTO(
+                clienteId,
+                "João Silva",
+                false,
+                LocalDateTime.now(),
+                "Adesão encerrada. Sua posição em custodia foi mantida."
+        );
+
+        when(clienteService.cancelarAdesao(clienteId)).thenReturn(cancelamentoResponse);
+
+        // Act
+        mockMvc.perform(post("/api/clientes/" + clienteId + "/saida")
+                .contentType(MediaType.APPLICATION_JSON));
+
+        // Assert
+        verify(clienteService, times(1)).cancelarAdesao(clienteId);
+    }
+
+    @Test
+    void deveUsarClienteIdDoPathVariable() throws Exception {
+        // Arrange
+        Long clienteId = 999L;
+        AdesaoCancelamentoResponseDTO cancelamentoResponse = new AdesaoCancelamentoResponseDTO(
+                clienteId,
+                "Teste",
+                false,
+                LocalDateTime.now(),
+                "Adesão encerrada. Sua posição em custodia foi mantida."
+        );
+
+        when(clienteService.cancelarAdesao(clienteId)).thenReturn(cancelamentoResponse);
+
+        // Act
+        mockMvc.perform(post("/api/clientes/" + clienteId + "/saida")
+                .contentType(MediaType.APPLICATION_JSON));
+
+        // Assert
+        verify(clienteService, times(1)).cancelarAdesao(999L);
+    }
+
+    @Test
+    void deveRetornarMensagemDeCancelamento() throws Exception {
+        // Arrange
+        Long clienteId = 1L;
+        AdesaoCancelamentoResponseDTO cancelamentoResponse = new AdesaoCancelamentoResponseDTO(
+                clienteId,
+                "João Silva",
+                false,
+                LocalDateTime.now(),
+                "Adesão encerrada. Sua posição em custodia foi mantida."
+        );
+
+        when(clienteService.cancelarAdesao(clienteId)).thenReturn(cancelamentoResponse);
+
+        // Act & Assert
+        mockMvc.perform(post("/api/clientes/" + clienteId + "/saida")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mensagem").value("Adesão encerrada. Sua posição em custodia foi mantida."));
+    }
+}
