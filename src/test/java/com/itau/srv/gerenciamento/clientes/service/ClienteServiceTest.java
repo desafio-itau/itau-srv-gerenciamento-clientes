@@ -1,9 +1,12 @@
 package com.itau.srv.gerenciamento.clientes.service;
 
+import com.itau.common.library.exception.NegocioException;
 import com.itau.common.library.exception.RecursoNaoEncontradoException;
 import com.itau.srv.gerenciamento.clientes.dto.adesao.AdesaoCancelamentoResponseDTO;
 import com.itau.srv.gerenciamento.clientes.dto.adesao.AdesaoRequestDTO;
 import com.itau.srv.gerenciamento.clientes.dto.adesao.AdesaoResponseDTO;
+import com.itau.srv.gerenciamento.clientes.dto.valormensal.AlterarValorMensalRequestDTO;
+import com.itau.srv.gerenciamento.clientes.dto.valormensal.AlterarValorMensalResponseDTO;
 import com.itau.srv.gerenciamento.clientes.mapper.ClienteMapper;
 import com.itau.srv.gerenciamento.clientes.model.Cliente;
 import com.itau.srv.gerenciamento.clientes.model.ContaGrafica;
@@ -328,6 +331,186 @@ class ClienteServiceTest {
 
         // Act
         clienteService.cancelarAdesao(clienteId);
+
+        // Assert
+        verify(clienteRepository, times(1)).findByIdAndAtivo(clienteId);
+    }
+
+    // Testes de Alteração de Valor Mensal
+
+    @Test
+    void deveAlterarValorMensalComSucesso() {
+        // Arrange
+        AlterarValorMensalRequestDTO requestDTO = new AlterarValorMensalRequestDTO(new BigDecimal("200.00"));
+        when(clienteRepository.findByIdAndAtivo(1L)).thenReturn(java.util.Optional.of(clienteSalvo));
+        when(clienteRepository.save(any(Cliente.class))).thenReturn(clienteSalvo);
+
+        // Act
+        AlterarValorMensalResponseDTO resultado = clienteService.alterarValorMensal(1L, requestDTO);
+
+        // Assert
+        assertNotNull(resultado);
+        assertEquals(1L, resultado.clienteId());
+        assertEquals(new BigDecimal("150.00"), resultado.valorMensalAnterior());
+        assertEquals(new BigDecimal("200.00"), resultado.valorMensalNovo());
+        assertNotNull(resultado.dataAlteracao());
+        assertEquals("Valor mensal atualizado. O novo valor será considerado a partir da próxima data de compra.", resultado.mensagem());
+        verify(clienteRepository, times(1)).findByIdAndAtivo(1L);
+        verify(clienteRepository, times(1)).save(clienteSalvo);
+    }
+
+    @Test
+    void deveAtualizarValorMensalDoCliente() {
+        // Arrange
+        AlterarValorMensalRequestDTO requestDTO = new AlterarValorMensalRequestDTO(new BigDecimal("300.00"));
+        when(clienteRepository.findByIdAndAtivo(1L)).thenReturn(java.util.Optional.of(clienteSalvo));
+        when(clienteRepository.save(any(Cliente.class))).thenAnswer(invocation -> {
+            Cliente c = invocation.getArgument(0);
+            assertEquals(new BigDecimal("300.00"), c.getValorMensal());
+            return c;
+        });
+
+        // Act
+        clienteService.alterarValorMensal(1L, requestDTO);
+
+        // Assert
+        verify(clienteRepository, times(1)).save(clienteSalvo);
+    }
+
+    @Test
+    void deveLancarExcecaoAoAlterarValorMensalDeClienteInexistente() {
+        // Arrange
+        AlterarValorMensalRequestDTO requestDTO = new AlterarValorMensalRequestDTO(new BigDecimal("200.00"));
+        when(clienteRepository.findByIdAndAtivo(99999L)).thenReturn(java.util.Optional.empty());
+
+        // Act & Assert
+        RecursoNaoEncontradoException exception = assertThrows(
+                RecursoNaoEncontradoException.class,
+                () -> clienteService.alterarValorMensal(99999L, requestDTO)
+        );
+
+        assertEquals("CLIENTE_NAO_ENCONTRADO", exception.getMessage());
+        verify(clienteRepository, times(1)).findByIdAndAtivo(99999L);
+        verify(clienteRepository, never()).save(any(Cliente.class));
+    }
+
+    @Test
+    void deveLancarExcecaoQuandoValorMensalMenorOuIgualA100() {
+        // Arrange
+        AlterarValorMensalRequestDTO requestDTO = new AlterarValorMensalRequestDTO(new BigDecimal("100.00"));
+
+        // Act & Assert
+        NegocioException exception = assertThrows(
+                NegocioException.class,
+                () -> clienteService.alterarValorMensal(1L, requestDTO)
+        );
+
+        assertEquals("VALOR_MENSAL_INVALIDO", exception.getMessage());
+        verify(clienteRepository, never()).findByIdAndAtivo(any());
+        verify(clienteRepository, never()).save(any(Cliente.class));
+    }
+
+    @Test
+    void deveLancarExcecaoQuandoValorMensalIgual50() {
+        // Arrange
+        AlterarValorMensalRequestDTO requestDTO = new AlterarValorMensalRequestDTO(new BigDecimal("50.00"));
+
+        // Act & Assert
+        NegocioException exception = assertThrows(
+                NegocioException.class,
+                () -> clienteService.alterarValorMensal(1L, requestDTO)
+        );
+
+        assertEquals("VALOR_MENSAL_INVALIDO", exception.getMessage());
+    }
+
+    @Test
+    void deveRetornarValorAntigoCorreto() {
+        // Arrange
+        AlterarValorMensalRequestDTO requestDTO = new AlterarValorMensalRequestDTO(new BigDecimal("250.00"));
+        when(clienteRepository.findByIdAndAtivo(1L)).thenReturn(java.util.Optional.of(clienteSalvo));
+        when(clienteRepository.save(any(Cliente.class))).thenReturn(clienteSalvo);
+
+        // Act
+        AlterarValorMensalResponseDTO resultado = clienteService.alterarValorMensal(1L, requestDTO);
+
+        // Assert
+        assertEquals(new BigDecimal("150.00"), resultado.valorMensalAnterior());
+    }
+
+    @Test
+    void deveRetornarValorNovoCorreto() {
+        // Arrange
+        AlterarValorMensalRequestDTO requestDTO = new AlterarValorMensalRequestDTO(new BigDecimal("350.00"));
+        when(clienteRepository.findByIdAndAtivo(1L)).thenReturn(java.util.Optional.of(clienteSalvo));
+        when(clienteRepository.save(any(Cliente.class))).thenReturn(clienteSalvo);
+
+        // Act
+        AlterarValorMensalResponseDTO resultado = clienteService.alterarValorMensal(1L, requestDTO);
+
+        // Assert
+        assertEquals(new BigDecimal("350.00"), resultado.valorMensalNovo());
+    }
+
+    @Test
+    void deveRetornarMensagemPadraoDeAlteracao() {
+        // Arrange
+        AlterarValorMensalRequestDTO requestDTO = new AlterarValorMensalRequestDTO(new BigDecimal("180.00"));
+        when(clienteRepository.findByIdAndAtivo(1L)).thenReturn(java.util.Optional.of(clienteSalvo));
+        when(clienteRepository.save(any(Cliente.class))).thenReturn(clienteSalvo);
+
+        // Act
+        AlterarValorMensalResponseDTO resultado = clienteService.alterarValorMensal(1L, requestDTO);
+
+        // Assert
+        assertNotNull(resultado.mensagem());
+        assertEquals("Valor mensal atualizado. O novo valor será considerado a partir da próxima data de compra.", resultado.mensagem());
+    }
+
+    @Test
+    void deveRetornarDataAtualizacaoCorreta() {
+        // Arrange
+        AlterarValorMensalRequestDTO requestDTO = new AlterarValorMensalRequestDTO(new BigDecimal("220.00"));
+        when(clienteRepository.findByIdAndAtivo(1L)).thenReturn(java.util.Optional.of(clienteSalvo));
+        when(clienteRepository.save(any(Cliente.class))).thenReturn(clienteSalvo);
+
+        // Act
+        AlterarValorMensalResponseDTO resultado = clienteService.alterarValorMensal(1L, requestDTO);
+
+        // Assert
+        assertNotNull(resultado.dataAlteracao());
+    }
+
+    @Test
+    void deveSalvarClienteComNovoValorMensal() {
+        // Arrange
+        AlterarValorMensalRequestDTO requestDTO = new AlterarValorMensalRequestDTO(new BigDecimal("400.00"));
+        when(clienteRepository.findByIdAndAtivo(1L)).thenReturn(java.util.Optional.of(clienteSalvo));
+        when(clienteRepository.save(any(Cliente.class))).thenReturn(clienteSalvo);
+
+        // Act
+        clienteService.alterarValorMensal(1L, requestDTO);
+
+        // Assert
+        verify(clienteRepository, times(1)).save(clienteSalvo);
+    }
+
+    @Test
+    void deveChamarFindByIdAndAtivoComIdCorretoParaAlteracao() {
+        // Arrange
+        Long clienteId = 7L;
+        Cliente clienteTeste = new Cliente();
+        clienteTeste.setId(clienteId);
+        clienteTeste.setNome("Teste");
+        clienteTeste.setValorMensal(new BigDecimal("150.00"));
+        clienteTeste.setAtivo(true);
+
+        AlterarValorMensalRequestDTO requestDTO = new AlterarValorMensalRequestDTO(new BigDecimal("200.00"));
+        when(clienteRepository.findByIdAndAtivo(clienteId)).thenReturn(java.util.Optional.of(clienteTeste));
+        when(clienteRepository.save(any(Cliente.class))).thenReturn(clienteTeste);
+
+        // Act
+        clienteService.alterarValorMensal(clienteId, requestDTO);
 
         // Assert
         verify(clienteRepository, times(1)).findByIdAndAtivo(clienteId);
