@@ -4,12 +4,15 @@ import com.itau.common.library.generic.ControllerGenerico;
 import com.itau.srv.gerenciamento.clientes.dto.adesao.AdesaoCancelamentoResponseDTO;
 import com.itau.srv.gerenciamento.clientes.dto.adesao.AdesaoRequestDTO;
 import com.itau.srv.gerenciamento.clientes.dto.adesao.AdesaoResponseDTO;
+import com.itau.srv.gerenciamento.clientes.dto.valormensal.AlterarValorMensalRequestDTO;
+import com.itau.srv.gerenciamento.clientes.dto.valormensal.AlterarValorMensalResponseDTO;
 import com.itau.srv.gerenciamento.clientes.service.ClienteService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
 
 @RestController
 @RequestMapping("api/clientes")
@@ -33,12 +36,24 @@ public class ClientesController implements ControllerGenerico {
     }
 
     @PostMapping("/{clienteId}/saida")
-    public ResponseEntity<AdesaoCancelamentoResponseDTO> cancelarAdesao(@PathVariable("clienteId") Long clienteId) {
+    public ResponseEntity<AdesaoCancelamentoResponseDTO> cancelarAdesao(@PathVariable Long clienteId) {
         log.info("Cancelando adesao do cliente: {}", clienteId);
 
 
         return ResponseEntity
                 .ok()
                 .body(clienteService.cancelarAdesao(clienteId));
+    }
+
+    @PutMapping("/{clienteId}/valor-mensal")
+    public ResponseEntity<AlterarValorMensalResponseDTO> atualizarValorMensal(
+            @PathVariable Long clienteId,
+            @RequestBody AlterarValorMensalRequestDTO novoValorMensal)
+    {
+        log.info("Atualizando valor mensal do cliente: {}", clienteId);
+
+        return ResponseEntity
+                .ok()
+                .body(clienteService.alterarValorMensal(clienteId, novoValorMensal));
     }
 }

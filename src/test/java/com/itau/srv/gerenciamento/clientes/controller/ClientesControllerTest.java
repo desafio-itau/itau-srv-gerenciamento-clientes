@@ -5,6 +5,8 @@ import com.itau.srv.gerenciamento.clientes.dto.adesao.AdesaoCancelamentoResponse
 import com.itau.srv.gerenciamento.clientes.dto.adesao.AdesaoRequestDTO;
 import com.itau.srv.gerenciamento.clientes.dto.adesao.AdesaoResponseDTO;
 import com.itau.srv.gerenciamento.clientes.dto.contagrafica.ContaGraficaResponseDTO;
+import com.itau.srv.gerenciamento.clientes.dto.valormensal.AlterarValorMensalRequestDTO;
+import com.itau.srv.gerenciamento.clientes.dto.valormensal.AlterarValorMensalResponseDTO;
 import com.itau.srv.gerenciamento.clientes.model.enums.TipoConta;
 import com.itau.srv.gerenciamento.clientes.service.ClienteService;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,6 +25,7 @@ import java.time.LocalDateTime;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -348,5 +351,215 @@ class ClientesControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.mensagem").value("Adesão encerrada. Sua posição em custodia foi mantida."));
+    }
+
+    // Testes de Alteração de Valor Mensal
+
+    @Test
+    void deveAlterarValorMensalComSucesso() throws Exception {
+        // Arrange
+        Long clienteId = 1L;
+        AlterarValorMensalRequestDTO requestDTO = new AlterarValorMensalRequestDTO(new BigDecimal("200.00"));
+        AlterarValorMensalResponseDTO responseDTO = new AlterarValorMensalResponseDTO(
+                clienteId,
+                new BigDecimal("150.00"),
+                new BigDecimal("200.00"),
+                LocalDateTime.now(),
+                "Valor mensal atualizado. O novo valor será considerado a partir da próxima data de compra."
+        );
+
+        when(clienteService.alterarValorMensal(eq(clienteId), any(AlterarValorMensalRequestDTO.class)))
+                .thenReturn(responseDTO);
+
+        // Act & Assert
+        mockMvc.perform(put("/api/clientes/" + clienteId + "/valor-mensal")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(requestDTO)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.clienteId").value(clienteId))
+                .andExpect(jsonPath("$.valorMensalAnterior").value(150.00))
+                .andExpect(jsonPath("$.valorMensalNovo").value(200.00))
+                .andExpect(jsonPath("$.dataAlteracao").exists())
+                .andExpect(jsonPath("$.mensagem").value("Valor mensal atualizado. O novo valor será considerado a partir da próxima data de compra."));
+
+        verify(clienteService, times(1)).alterarValorMensal(eq(clienteId), any(AlterarValorMensalRequestDTO.class));
+    }
+
+    @Test
+    void deveRetornarStatus200QuandoAlteracaoComSucesso() throws Exception {
+        // Arrange
+        Long clienteId = 1L;
+        AlterarValorMensalRequestDTO requestDTO = new AlterarValorMensalRequestDTO(new BigDecimal("250.00"));
+        AlterarValorMensalResponseDTO responseDTO = new AlterarValorMensalResponseDTO(
+                clienteId,
+                new BigDecimal("150.00"),
+                new BigDecimal("250.00"),
+                LocalDateTime.now(),
+                "Valor mensal atualizado. O novo valor será considerado a partir da próxima data de compra."
+        );
+
+        when(clienteService.alterarValorMensal(eq(clienteId), any(AlterarValorMensalRequestDTO.class)))
+                .thenReturn(responseDTO);
+
+        // Act & Assert
+        mockMvc.perform(put("/api/clientes/" + clienteId + "/valor-mensal")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(requestDTO)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void deveRetornarDadosDaAlteracaoNaResposta() throws Exception {
+        // Arrange
+        Long clienteId = 1L;
+        AlterarValorMensalRequestDTO requestDTO = new AlterarValorMensalRequestDTO(new BigDecimal("300.00"));
+        AlterarValorMensalResponseDTO responseDTO = new AlterarValorMensalResponseDTO(
+                clienteId,
+                new BigDecimal("150.00"),
+                new BigDecimal("300.00"),
+                LocalDateTime.now(),
+                "Valor mensal atualizado. O novo valor será considerado a partir da próxima data de compra."
+        );
+
+        when(clienteService.alterarValorMensal(eq(clienteId), any(AlterarValorMensalRequestDTO.class)))
+                .thenReturn(responseDTO);
+
+        // Act & Assert
+        mockMvc.perform(put("/api/clientes/" + clienteId + "/valor-mensal")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(requestDTO)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.clienteId").exists())
+                .andExpect(jsonPath("$.valorMensalAnterior").exists())
+                .andExpect(jsonPath("$.valorMensalNovo").exists())
+                .andExpect(jsonPath("$.dataAlteracao").exists())
+                .andExpect(jsonPath("$.mensagem").exists());
+    }
+
+    @Test
+    void deveRetornarValorAntigoENovoCorretos() throws Exception {
+        // Arrange
+        Long clienteId = 1L;
+        AlterarValorMensalRequestDTO requestDTO = new AlterarValorMensalRequestDTO(new BigDecimal("350.00"));
+        AlterarValorMensalResponseDTO responseDTO = new AlterarValorMensalResponseDTO(
+                clienteId,
+                new BigDecimal("150.00"),
+                new BigDecimal("350.00"),
+                LocalDateTime.now(),
+                "Valor mensal atualizado. O novo valor será considerado a partir da próxima data de compra."
+        );
+
+        when(clienteService.alterarValorMensal(eq(clienteId), any(AlterarValorMensalRequestDTO.class)))
+                .thenReturn(responseDTO);
+
+        // Act & Assert
+        mockMvc.perform(put("/api/clientes/" + clienteId + "/valor-mensal")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(requestDTO)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.valorMensalAnterior").value(150.00))
+                .andExpect(jsonPath("$.valorMensalNovo").value(350.00));
+    }
+
+    @Test
+    void deveChamarServiceParaAlterar() throws Exception {
+        // Arrange
+        Long clienteId = 1L;
+        AlterarValorMensalRequestDTO requestDTO = new AlterarValorMensalRequestDTO(new BigDecimal("180.00"));
+        AlterarValorMensalResponseDTO responseDTO = new AlterarValorMensalResponseDTO(
+                clienteId,
+                new BigDecimal("150.00"),
+                new BigDecimal("180.00"),
+                LocalDateTime.now(),
+                "Valor mensal atualizado. O novo valor será considerado a partir da próxima data de compra."
+        );
+
+        when(clienteService.alterarValorMensal(eq(clienteId), any(AlterarValorMensalRequestDTO.class)))
+                .thenReturn(responseDTO);
+
+        // Act
+        mockMvc.perform(put("/api/clientes/" + clienteId + "/valor-mensal")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(requestDTO)));
+
+        // Assert
+        verify(clienteService, times(1)).alterarValorMensal(eq(clienteId), any(AlterarValorMensalRequestDTO.class));
+    }
+
+    @Test
+    void deveUsarClienteIdDoPathVariableParaAlteracao() throws Exception {
+        // Arrange
+        Long clienteId = 999L;
+        AlterarValorMensalRequestDTO requestDTO = new AlterarValorMensalRequestDTO(new BigDecimal("500.00"));
+        AlterarValorMensalResponseDTO responseDTO = new AlterarValorMensalResponseDTO(
+                clienteId,
+                new BigDecimal("150.00"),
+                new BigDecimal("500.00"),
+                LocalDateTime.now(),
+                "Valor mensal atualizado. O novo valor será considerado a partir da próxima data de compra."
+        );
+
+        when(clienteService.alterarValorMensal(eq(clienteId), any(AlterarValorMensalRequestDTO.class)))
+                .thenReturn(responseDTO);
+
+        // Act
+        mockMvc.perform(put("/api/clientes/" + clienteId + "/valor-mensal")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(requestDTO)));
+
+        // Assert
+        verify(clienteService, times(1)).alterarValorMensal(eq(999L), any(AlterarValorMensalRequestDTO.class));
+    }
+
+    @Test
+    void deveRetornarMensagemDeAlteracao() throws Exception {
+        // Arrange
+        Long clienteId = 1L;
+        AlterarValorMensalRequestDTO requestDTO = new AlterarValorMensalRequestDTO(new BigDecimal("220.00"));
+        AlterarValorMensalResponseDTO responseDTO = new AlterarValorMensalResponseDTO(
+                clienteId,
+                new BigDecimal("150.00"),
+                new BigDecimal("220.00"),
+                LocalDateTime.now(),
+                "Valor mensal atualizado. O novo valor será considerado a partir da próxima data de compra."
+        );
+
+        when(clienteService.alterarValorMensal(eq(clienteId), any(AlterarValorMensalRequestDTO.class)))
+                .thenReturn(responseDTO);
+
+        // Act & Assert
+        mockMvc.perform(put("/api/clientes/" + clienteId + "/valor-mensal")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(requestDTO)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mensagem").value("Valor mensal atualizado. O novo valor será considerado a partir da próxima data de compra."));
+    }
+
+    @Test
+    void deveAceitarRequestBodyComNovoValorMensal() throws Exception {
+        // Arrange
+        Long clienteId = 1L;
+        String jsonRequest = """
+                {
+                    "novoValorMensal": 400.00
+                }
+                """;
+        AlterarValorMensalResponseDTO responseDTO = new AlterarValorMensalResponseDTO(
+                clienteId,
+                new BigDecimal("150.00"),
+                new BigDecimal("400.00"),
+                LocalDateTime.now(),
+                "Valor mensal atualizado. O novo valor será considerado a partir da próxima data de compra."
+        );
+
+        when(clienteService.alterarValorMensal(eq(clienteId), any(AlterarValorMensalRequestDTO.class)))
+                .thenReturn(responseDTO);
+
+        // Act & Assert
+        mockMvc.perform(put("/api/clientes/" + clienteId + "/valor-mensal")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonRequest))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.valorMensalNovo").value(400.00));
     }
 }
