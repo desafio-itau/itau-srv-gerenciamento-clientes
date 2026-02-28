@@ -13,6 +13,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 
 @RestController
 @RequestMapping("api/clientes")
@@ -55,5 +57,14 @@ public class ClientesController implements ControllerGenerico {
         return ResponseEntity
                 .ok()
                 .body(clienteService.alterarValorMensal(clienteId, novoValorMensal));
+    }
+
+    @GetMapping
+    public ResponseEntity<List<AdesaoResponseDTO>> buscarClientesAtivos() {
+        log.info("Buscando clientes ativos");
+
+        return ResponseEntity
+                .ok()
+                .body(clienteService.buscarClientesAtivos());
     }
 }

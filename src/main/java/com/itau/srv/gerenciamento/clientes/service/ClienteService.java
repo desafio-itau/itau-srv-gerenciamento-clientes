@@ -11,6 +11,7 @@ import com.itau.srv.gerenciamento.clientes.mapper.ClienteMapper;
 import com.itau.srv.gerenciamento.clientes.model.Cliente;
 import com.itau.srv.gerenciamento.clientes.model.ContaGrafica;
 import com.itau.srv.gerenciamento.clientes.repository.ClienteRepository;
+import com.itau.srv.gerenciamento.clientes.repository.ContaGraficaRepository;
 import com.itau.srv.gerenciamento.clientes.validator.ClienteValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -29,6 +32,7 @@ public class ClienteService {
     private final ClienteRepository clienteRepository;
     private final ClienteMapper clienteMapper;
     private final ContaGraficaService contaGraficaService;
+    private final ContaGraficaRepository contaGraficaRepository;
 
     private static final String ADESAO_ENCERRADA = "Adesão encerrada. Sua posição em custodia foi mantida.";
     private static final String ALTERAR_VALOR_MENSAL = "Valor mensal atualizado. O novo valor será considerado a partir da próxima data de compra.";
@@ -100,5 +104,19 @@ public class ClienteService {
                 LocalDateTime.now(),
                 ALTERAR_VALOR_MENSAL
         );
+    }
+
+    @Transactional(readOnly = true)
+    public List<AdesaoResponseDTO> buscarClientesAtivos() {
+        List<Cliente> ativos = clienteRepository.findAllAtivos();
+        List<AdesaoResponseDTO> response = new ArrayList<>();
+
+        ativos.forEach(cliente -> {
+            ContaGrafica conta = contaGraficaRepository.findByCliente(cliente);
+            clienteMapper.mapearParaAdesaoResponseDTO(cliente, conta);
+            response.add(clienteMapper.mapearParaAdesaoResponseDTO(cliente, conta));
+        });
+
+        return response;
     }
 }
