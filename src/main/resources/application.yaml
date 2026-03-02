@@ -31,3 +31,15 @@ spring:
 server:
   port: 8080
 
+external-endpoints:
+  itau-srv-custodias:
+    name: itau-srv-custodias
+    url: ${ITAU_SRV_CUSTODIAS_URL:http://localhost:8082/api/custodias}
+    connection-timeout: 3000
+    read-timeout: 8000
+  itau-srv-valores:
+    name: itau-srv-valores
+    url: ${ITAU_SRV_VALORES_URL:http://localhost:8082/api/valores}
+    connection-timeout: 3000
+    read-timeout: 8000
+
