@@ -4,8 +4,10 @@ import com.itau.common.library.generic.ControllerGenerico;
 import com.itau.srv.gerenciamento.clientes.dto.adesao.AdesaoCancelamentoResponseDTO;
 import com.itau.srv.gerenciamento.clientes.dto.adesao.AdesaoRequestDTO;
 import com.itau.srv.gerenciamento.clientes.dto.adesao.AdesaoResponseDTO;
+import com.itau.srv.gerenciamento.clientes.dto.carteira.CarteiraResponseDTO;
 import com.itau.srv.gerenciamento.clientes.dto.valormensal.AlterarValorMensalRequestDTO;
 import com.itau.srv.gerenciamento.clientes.dto.valormensal.AlterarValorMensalResponseDTO;
+import com.itau.srv.gerenciamento.clientes.service.CarteiraService;
 import com.itau.srv.gerenciamento.clientes.service.ClienteService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +25,7 @@ import java.util.List;
 public class ClientesController implements ControllerGenerico {
 
     private final ClienteService clienteService;
+    private final CarteiraService carteiraService;
 
     @PostMapping("/adesao")
     public ResponseEntity<AdesaoResponseDTO> aderirAoProduto(@RequestBody @Valid AdesaoRequestDTO dto) {
@@ -66,5 +69,12 @@ public class ClientesController implements ControllerGenerico {
         return ResponseEntity
                 .ok()
                 .body(clienteService.buscarClientesAtivos());
+    }
+
+    @GetMapping("/{clienteId}/carteira")
+    public ResponseEntity<CarteiraResponseDTO> buscarCarteira(@PathVariable Long clienteId) {
+        log.info("Buscando carteira do cliente: {}", clienteId);
+
+        return ResponseEntity.ok(carteiraService.consultarCarteiraCliente(clienteId));
     }
 }

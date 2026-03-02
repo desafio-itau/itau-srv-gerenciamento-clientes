@@ -4,10 +4,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.itau.srv.gerenciamento.clientes.dto.adesao.AdesaoCancelamentoResponseDTO;
 import com.itau.srv.gerenciamento.clientes.dto.adesao.AdesaoRequestDTO;
 import com.itau.srv.gerenciamento.clientes.dto.adesao.AdesaoResponseDTO;
+import com.itau.srv.gerenciamento.clientes.dto.carteira.AtivoResponseDTO;
+import com.itau.srv.gerenciamento.clientes.dto.carteira.CarteiraResponseDTO;
+import com.itau.srv.gerenciamento.clientes.dto.carteira.ResumoResponseDTO;
 import com.itau.srv.gerenciamento.clientes.dto.contagrafica.ContaGraficaResponseDTO;
 import com.itau.srv.gerenciamento.clientes.dto.valormensal.AlterarValorMensalRequestDTO;
 import com.itau.srv.gerenciamento.clientes.dto.valormensal.AlterarValorMensalResponseDTO;
 import com.itau.srv.gerenciamento.clientes.model.enums.TipoConta;
+import com.itau.srv.gerenciamento.clientes.service.CarteiraService;
 import com.itau.srv.gerenciamento.clientes.service.ClienteService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,11 +25,12 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.Collections;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -33,6 +38,9 @@ class ClientesControllerTest {
 
     @Mock
     private ClienteService clienteService;
+
+    @Mock
+    private CarteiraService carteiraService;
 
     @InjectMocks
     private ClientesController clientesController;
@@ -562,4 +570,252 @@ class ClientesControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.valorMensalNovo").value(400.00));
     }
+
+    // ==================== TESTES DE CONSULTA DE CARTEIRA ====================
+
+    @Test
+    void deveBuscarCarteiraComSucesso() throws Exception {
+        // Arrange
+        Long clienteId = 1L;
+        ResumoResponseDTO resumo = new ResumoResponseDTO(
+                new BigDecimal("5000.00"),
+                new BigDecimal("5500.00"),
+                new BigDecimal("500.00"),
+                new BigDecimal("10.00")
+        );
+
+        AtivoResponseDTO ativo1 = new AtivoResponseDTO(
+                "PETR4",
+                100,
+                new BigDecimal("30.00"),
+                new BigDecimal("35.00"),
+                new BigDecimal("500.00"),
+                new BigDecimal("0.67"),
+                new BigDecimal("0.52")
+        );
+
+        AtivoResponseDTO ativo2 = new AtivoResponseDTO(
+                "VALE3",
+                50,
+                new BigDecimal("60.00"),
+                new BigDecimal("65.00"),
+                new BigDecimal("250.00"),
+                new BigDecimal("0.33"),
+                new BigDecimal("0.48")
+        );
+
+        CarteiraResponseDTO carteiraResponse = new CarteiraResponseDTO(
+                clienteId,
+                "João Silva",
+                "ITAUFL00001",
+                LocalDateTime.now(),
+                resumo,
+                Arrays.asList(ativo1, ativo2)
+        );
+
+        when(carteiraService.consultarCarteiraCliente(clienteId)).thenReturn(carteiraResponse);
+
+        // Act & Assert
+        mockMvc.perform(get("/api/clientes/" + clienteId + "/carteira")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.clienteId").value(1))
+                .andExpect(jsonPath("$.nome").value("João Silva"))
+                .andExpect(jsonPath("$.contaGrafica").value("ITAUFL00001"))
+                .andExpect(jsonPath("$.dataConsulta").exists())
+                .andExpect(jsonPath("$.resumo").exists())
+                .andExpect(jsonPath("$.resumo.valorTotalInvestido").value(5000.00))
+                .andExpect(jsonPath("$.resumo.valorAtualCarteira").value(5500.00))
+                .andExpect(jsonPath("$.resumo.plTotal").value(500.00))
+                .andExpect(jsonPath("$.resumo.rentabilidadePercentual").value(10.00))
+                .andExpect(jsonPath("$.ativos").isArray())
+                .andExpect(jsonPath("$.ativos.length()").value(2))
+                .andExpect(jsonPath("$.ativos[0].ticker").value("PETR4"))
+                .andExpect(jsonPath("$.ativos[1].ticker").value("VALE3"));
+
+        verify(carteiraService, times(1)).consultarCarteiraCliente(clienteId);
+    }
+
+    @Test
+    void deveChamarServiceParaBuscarCarteira() throws Exception {
+        // Arrange
+        Long clienteId = 5L;
+        CarteiraResponseDTO carteiraResponse = new CarteiraResponseDTO(
+                clienteId,
+                "Maria Santos",
+                "ITAUFL00005",
+                LocalDateTime.now(),
+                new ResumoResponseDTO(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO),
+                Collections.emptyList()
+        );
+
+        when(carteiraService.consultarCarteiraCliente(clienteId)).thenReturn(carteiraResponse);
+
+        // Act & Assert
+        mockMvc.perform(get("/api/clientes/" + clienteId + "/carteira"))
+                .andExpect(status().isOk());
+
+        verify(carteiraService, times(1)).consultarCarteiraCliente(clienteId);
+    }
+
+    @Test
+    void deveRetornarDadosDoResumoNaCarteira() throws Exception {
+        // Arrange
+        Long clienteId = 1L;
+        ResumoResponseDTO resumo = new ResumoResponseDTO(
+                new BigDecimal("10000.00"),
+                new BigDecimal("12000.00"),
+                new BigDecimal("2000.00"),
+                new BigDecimal("20.00")
+        );
+
+        CarteiraResponseDTO carteiraResponse = new CarteiraResponseDTO(
+                clienteId,
+                "João Silva",
+                "ITAUFL00001",
+                LocalDateTime.now(),
+                resumo,
+                Collections.emptyList()
+        );
+
+        when(carteiraService.consultarCarteiraCliente(clienteId)).thenReturn(carteiraResponse);
+
+        // Act & Assert
+        mockMvc.perform(get("/api/clientes/" + clienteId + "/carteira"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resumo.valorTotalInvestido").value(10000.00))
+                .andExpect(jsonPath("$.resumo.valorAtualCarteira").value(12000.00))
+                .andExpect(jsonPath("$.resumo.plTotal").value(2000.00))
+                .andExpect(jsonPath("$.resumo.rentabilidadePercentual").value(20.00));
+    }
+
+    @Test
+    void deveRetornarListaDeAtivosNaCarteira() throws Exception {
+        // Arrange
+        Long clienteId = 1L;
+        AtivoResponseDTO ativo1 = new AtivoResponseDTO(
+                "PETR4",
+                100,
+                new BigDecimal("30.00"),
+                new BigDecimal("35.00"),
+                new BigDecimal("500.00"),
+                new BigDecimal("1.00"),
+                new BigDecimal("1.00")
+        );
+
+        CarteiraResponseDTO carteiraResponse = new CarteiraResponseDTO(
+                clienteId,
+                "João Silva",
+                "ITAUFL00001",
+                LocalDateTime.now(),
+                new ResumoResponseDTO(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO),
+                Collections.singletonList(ativo1)
+        );
+
+        when(carteiraService.consultarCarteiraCliente(clienteId)).thenReturn(carteiraResponse);
+
+        // Act & Assert
+        mockMvc.perform(get("/api/clientes/" + clienteId + "/carteira"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ativos").isArray())
+                .andExpect(jsonPath("$.ativos.length()").value(1))
+                .andExpect(jsonPath("$.ativos[0].ticker").value("PETR4"))
+                .andExpect(jsonPath("$.ativos[0].quantidade").value(100))
+                .andExpect(jsonPath("$.ativos[0].precoMedio").value(30.00))
+                .andExpect(jsonPath("$.ativos[0].cotacaoAtual").value(35.00))
+                .andExpect(jsonPath("$.ativos[0].pl").value(500.00))
+                .andExpect(jsonPath("$.ativos[0].plPercentual").value(1.00))
+                .andExpect(jsonPath("$.ativos[0].composicaoCarteira").value(1.00));
+    }
+
+    @Test
+    void deveRetornarCarteiraVaziaQuandoNaoHaAtivos() throws Exception {
+        // Arrange
+        Long clienteId = 1L;
+        CarteiraResponseDTO carteiraResponse = new CarteiraResponseDTO(
+                clienteId,
+                "João Silva",
+                "ITAUFL00001",
+                LocalDateTime.now(),
+                new ResumoResponseDTO(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO),
+                Collections.emptyList()
+        );
+
+        when(carteiraService.consultarCarteiraCliente(clienteId)).thenReturn(carteiraResponse);
+
+        // Act & Assert
+        mockMvc.perform(get("/api/clientes/" + clienteId + "/carteira"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ativos").isArray())
+                .andExpect(jsonPath("$.ativos.length()").value(0))
+                .andExpect(jsonPath("$.resumo.valorTotalInvestido").value(0))
+                .andExpect(jsonPath("$.resumo.valorAtualCarteira").value(0));
+    }
+
+    @Test
+    void deveRetornarDadosCompletosDosAtivos() throws Exception {
+        // Arrange
+        Long clienteId = 1L;
+        AtivoResponseDTO ativo = new AtivoResponseDTO(
+                "ITUB4",
+                200,
+                new BigDecimal("25.50"),
+                new BigDecimal("27.00"),
+                new BigDecimal("300.00"),
+                new BigDecimal("0.75"),
+                new BigDecimal("0.85")
+        );
+
+        CarteiraResponseDTO carteiraResponse = new CarteiraResponseDTO(
+                clienteId,
+                "João Silva",
+                "ITAUFL00001",
+                LocalDateTime.now(),
+                new ResumoResponseDTO(
+                        new BigDecimal("5100.00"),
+                        new BigDecimal("5400.00"),
+                        new BigDecimal("300.00"),
+                        new BigDecimal("5.88")
+                ),
+                Collections.singletonList(ativo)
+        );
+
+        when(carteiraService.consultarCarteiraCliente(clienteId)).thenReturn(carteiraResponse);
+
+        // Act & Assert
+        mockMvc.perform(get("/api/clientes/" + clienteId + "/carteira"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ativos[0].ticker").value("ITUB4"))
+                .andExpect(jsonPath("$.ativos[0].quantidade").value(200))
+                .andExpect(jsonPath("$.ativos[0].precoMedio").value(25.50))
+                .andExpect(jsonPath("$.ativos[0].cotacaoAtual").value(27.00))
+                .andExpect(jsonPath("$.ativos[0].pl").value(300.00))
+                .andExpect(jsonPath("$.ativos[0].plPercentual").value(0.75))
+                .andExpect(jsonPath("$.ativos[0].composicaoCarteira").value(0.85));
+    }
+
+    @Test
+    void deveUsarPathVariableCorretamente() throws Exception {
+        // Arrange
+        Long clienteId = 99L;
+        CarteiraResponseDTO carteiraResponse = new CarteiraResponseDTO(
+                clienteId,
+                "Teste",
+                "ITAUFL00099",
+                LocalDateTime.now(),
+                new ResumoResponseDTO(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO),
+                Collections.emptyList()
+        );
+
+        when(carteiraService.consultarCarteiraCliente(clienteId)).thenReturn(carteiraResponse);
+
+        // Act & Assert
+        mockMvc.perform(get("/api/clientes/" + clienteId + "/carteira"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.clienteId").value(99));
+
+        verify(carteiraService).consultarCarteiraCliente(99L);
+    }
 }
+
+
