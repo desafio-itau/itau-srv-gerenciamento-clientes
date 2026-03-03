@@ -113,7 +113,6 @@ public class ClienteService {
 
         ativos.forEach(cliente -> {
             ContaGrafica conta = contaGraficaRepository.findByCliente(cliente);
-            clienteMapper.mapearParaAdesaoResponseDTO(cliente, conta);
             response.add(clienteMapper.mapearParaAdesaoResponseDTO(cliente, conta));
         });
 
