@@ -5,14 +5,17 @@ import com.itau.srv.gerenciamento.clientes.dto.carteira.AtivoResponseDTO;
 import com.itau.srv.gerenciamento.clientes.dto.carteira.CarteiraResponseDTO;
 import com.itau.srv.gerenciamento.clientes.dto.carteira.ResumoResponseDTO;
 import com.itau.srv.gerenciamento.clientes.dto.custodia.CustodiaResponseDTO;
+import com.itau.srv.gerenciamento.clientes.dto.valor.ValoresPorDataResponseDTO;
 import com.itau.srv.gerenciamento.clientes.dto.valor.ValoresResponseDTO;
 import com.itau.srv.gerenciamento.clientes.feign.CustodiasFeignClient;
 import com.itau.srv.gerenciamento.clientes.feign.ValoresFeignClient;
 import com.itau.srv.gerenciamento.clientes.mapper.CarteiraMaper;
 import com.itau.srv.gerenciamento.clientes.model.Cliente;
 import com.itau.srv.gerenciamento.clientes.model.ContaGrafica;
+import com.itau.srv.gerenciamento.clientes.model.SnapshotCarteira;
 import com.itau.srv.gerenciamento.clientes.repository.ClienteRepository;
 import com.itau.srv.gerenciamento.clientes.repository.ContaGraficaRepository;
+import com.itau.srv.gerenciamento.clientes.repository.SnapshotCarteiraRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,6 +24,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collections;
@@ -48,6 +52,9 @@ class CarteiraServiceTest {
 
     @Mock
     private ValoresFeignClient valoresFeignClient;
+
+    @Mock
+    private SnapshotCarteiraRepository snapshotCarteiraRepository;
 
     @InjectMocks
     private CarteiraService carteiraService;
@@ -354,5 +361,355 @@ class CarteiraServiceTest {
         assertNotNull(resultado);
         verify(valoresFeignClient).obterValoresPorCliente(1L);
     }
-}
 
+    // =========== TESTES PARA GERAR SNAPSHOTS ===========
+
+    @Test
+    void deveGerarSnapshotsComSucesso() {
+        // Arrange
+        LocalDate data = LocalDate.of(2026, 2, 5);
+
+        Cliente cliente1 = new Cliente();
+        cliente1.setId(1L);
+        cliente1.setNome("Cliente 1");
+
+        Cliente cliente2 = new Cliente();
+        cliente2.setId(2L);
+        cliente2.setNome("Cliente 2");
+
+        List<Cliente> clientes = Arrays.asList(cliente1, cliente2);
+
+        List<CustodiaResponseDTO> custodias1 = Arrays.asList(
+                new CustodiaResponseDTO("PETR4", 100, new BigDecimal("30.00"), new BigDecimal("35.00"), "COMPRA")
+        );
+
+        List<CustodiaResponseDTO> custodias2 = Arrays.asList(
+                new CustodiaResponseDTO("VALE3", 50, new BigDecimal("60.00"), new BigDecimal("65.00"), "COMPRA")
+        );
+
+        ValoresResponseDTO valores1 = new ValoresResponseDTO(new BigDecimal("3000.00"), BigDecimal.ZERO);
+        ValoresResponseDTO valores2 = new ValoresResponseDTO(new BigDecimal("3000.00"), BigDecimal.ZERO);
+
+        ValoresPorDataResponseDTO valoresPorData1 = new ValoresPorDataResponseDTO(data, valores1);
+        ValoresPorDataResponseDTO valoresPorData2 = new ValoresPorDataResponseDTO(data, valores2);
+
+        when(clienteRepository.findAllAtivos()).thenReturn(clientes);
+        when(custodiasFeignClient.obterCustodiasPorClienteId(1L)).thenReturn(custodias1);
+        when(custodiasFeignClient.obterCustodiasPorClienteId(2L)).thenReturn(custodias2);
+        when(valoresFeignClient.obterValoresPorClienteEData(1L, data)).thenReturn(valoresPorData1);
+        when(valoresFeignClient.obterValoresPorClienteEData(2L, data)).thenReturn(valoresPorData2);
+        when(snapshotCarteiraRepository.saveAll(anyList())).thenReturn(Collections.emptyList());
+
+        // Act
+        carteiraService.gerarSnapshots(data);
+
+        // Assert
+        verify(clienteRepository).findAllAtivos();
+        verify(custodiasFeignClient).obterCustodiasPorClienteId(1L);
+        verify(custodiasFeignClient).obterCustodiasPorClienteId(2L);
+        verify(valoresFeignClient).obterValoresPorClienteEData(1L, data);
+        verify(valoresFeignClient).obterValoresPorClienteEData(2L, data);
+        verify(snapshotCarteiraRepository).saveAll(anyList());
+    }
+
+    @Test
+    void deveCalcularValorCarteiraCorretamente() {
+        // Arrange
+        LocalDate data = LocalDate.of(2026, 2, 5);
+        Cliente cliente = new Cliente();
+        cliente.setId(1L);
+
+        List<CustodiaResponseDTO> custodias = Arrays.asList(
+                new CustodiaResponseDTO("PETR4", 100, new BigDecimal("30.00"), new BigDecimal("35.00"), "COMPRA"),
+                new CustodiaResponseDTO("VALE3", 50, new BigDecimal("60.00"), new BigDecimal("65.00"), "COMPRA")
+        );
+
+        // Valor esperado: (35 * 100) + (65 * 50) = 3500 + 3250 = 6750
+        ValoresResponseDTO valores = new ValoresResponseDTO(new BigDecimal("6000.00"), BigDecimal.ZERO);
+        ValoresPorDataResponseDTO valoresPorData = new ValoresPorDataResponseDTO(data, valores);
+
+        when(clienteRepository.findAllAtivos()).thenReturn(Collections.singletonList(cliente));
+        when(custodiasFeignClient.obterCustodiasPorClienteId(1L)).thenReturn(custodias);
+        when(valoresFeignClient.obterValoresPorClienteEData(1L, data)).thenReturn(valoresPorData);
+        when(snapshotCarteiraRepository.saveAll(anyList())).thenAnswer(invocation -> {
+            List<SnapshotCarteira> snapshots = invocation.getArgument(0);
+            assertEquals(1, snapshots.size());
+            assertEquals(new BigDecimal("6750.00"), snapshots.get(0).getValorCarteira());
+            return snapshots;
+        });
+
+        // Act
+        carteiraService.gerarSnapshots(data);
+
+        // Assert
+        verify(snapshotCarteiraRepository).saveAll(anyList());
+    }
+
+    @Test
+    void deveCalcularRentabilidadeCorretamente() {
+        // Arrange
+        LocalDate data = LocalDate.of(2026, 2, 5);
+        Cliente cliente = new Cliente();
+        cliente.setId(1L);
+
+        List<CustodiaResponseDTO> custodias = Arrays.asList(
+                new CustodiaResponseDTO("PETR4", 100, new BigDecimal("30.00"), new BigDecimal("35.00"), "COMPRA")
+        );
+
+        // Valor carteira: 35 * 100 = 3500
+        // Valor investido: 3000 - 0 = 3000
+        // Rentabilidade: ((3500 - 3000) / 3000) * 100 = 16.66%
+        ValoresResponseDTO valores = new ValoresResponseDTO(new BigDecimal("3000.00"), BigDecimal.ZERO);
+        ValoresPorDataResponseDTO valoresPorData = new ValoresPorDataResponseDTO(data, valores);
+
+        when(clienteRepository.findAllAtivos()).thenReturn(Collections.singletonList(cliente));
+        when(custodiasFeignClient.obterCustodiasPorClienteId(1L)).thenReturn(custodias);
+        when(valoresFeignClient.obterValoresPorClienteEData(1L, data)).thenReturn(valoresPorData);
+        when(snapshotCarteiraRepository.saveAll(anyList())).thenAnswer(invocation -> {
+            List<SnapshotCarteira> snapshots = invocation.getArgument(0);
+            assertEquals(1, snapshots.size());
+            assertEquals(new BigDecimal("16.66"), snapshots.get(0).getRentabilidade());
+            return snapshots;
+        });
+
+        // Act
+        carteiraService.gerarSnapshots(data);
+
+        // Assert
+        verify(snapshotCarteiraRepository).saveAll(anyList());
+    }
+
+    @Test
+    void deveRetornarRentabilidadeZeroQuandoValorInvestidoForZero() {
+        // Arrange
+        LocalDate data = LocalDate.of(2026, 2, 5);
+        Cliente cliente = new Cliente();
+        cliente.setId(1L);
+
+        List<CustodiaResponseDTO> custodias = Arrays.asList(
+                new CustodiaResponseDTO("PETR4", 100, new BigDecimal("30.00"), new BigDecimal("35.00"), "COMPRA")
+        );
+
+        ValoresResponseDTO valores = new ValoresResponseDTO(BigDecimal.ZERO, BigDecimal.ZERO);
+        ValoresPorDataResponseDTO valoresPorData = new ValoresPorDataResponseDTO(data, valores);
+
+        when(clienteRepository.findAllAtivos()).thenReturn(Collections.singletonList(cliente));
+        when(custodiasFeignClient.obterCustodiasPorClienteId(1L)).thenReturn(custodias);
+        when(valoresFeignClient.obterValoresPorClienteEData(1L, data)).thenReturn(valoresPorData);
+        when(snapshotCarteiraRepository.saveAll(anyList())).thenAnswer(invocation -> {
+            List<SnapshotCarteira> snapshots = invocation.getArgument(0);
+            assertEquals(1, snapshots.size());
+            assertEquals(BigDecimal.ZERO, snapshots.get(0).getRentabilidade());
+            return snapshots;
+        });
+
+        // Act
+        carteiraService.gerarSnapshots(data);
+
+        // Assert
+        verify(snapshotCarteiraRepository).saveAll(anyList());
+    }
+
+    @Test
+    void deveGerarSnapshotParaTodosClientesAtivos() {
+        // Arrange
+        LocalDate data = LocalDate.of(2026, 2, 5);
+
+        Cliente cliente1 = new Cliente();
+        cliente1.setId(1L);
+
+        Cliente cliente2 = new Cliente();
+        cliente2.setId(2L);
+
+        Cliente cliente3 = new Cliente();
+        cliente3.setId(3L);
+
+        List<Cliente> clientes = Arrays.asList(cliente1, cliente2, cliente3);
+
+        ValoresResponseDTO valores = new ValoresResponseDTO(new BigDecimal("1000.00"), BigDecimal.ZERO);
+        ValoresPorDataResponseDTO valoresPorData = new ValoresPorDataResponseDTO(data, valores);
+
+        when(clienteRepository.findAllAtivos()).thenReturn(clientes);
+        when(custodiasFeignClient.obterCustodiasPorClienteId(anyLong())).thenReturn(Collections.emptyList());
+        when(valoresFeignClient.obterValoresPorClienteEData(anyLong(), eq(data))).thenReturn(valoresPorData);
+        when(snapshotCarteiraRepository.saveAll(anyList())).thenAnswer(invocation -> {
+            List<SnapshotCarteira> snapshots = invocation.getArgument(0);
+            assertEquals(3, snapshots.size());
+            return snapshots;
+        });
+
+        // Act
+        carteiraService.gerarSnapshots(data);
+
+        // Assert
+        verify(clienteRepository).findAllAtivos();
+        verify(snapshotCarteiraRepository).saveAll(anyList());
+    }
+
+    @Test
+    void deveDefinirClienteIdEDataNoSnapshot() {
+        // Arrange
+        LocalDate data = LocalDate.of(2026, 2, 15);
+        Cliente cliente = new Cliente();
+        cliente.setId(99L);
+
+        ValoresResponseDTO valores = new ValoresResponseDTO(new BigDecimal("1000.00"), BigDecimal.ZERO);
+        ValoresPorDataResponseDTO valoresPorData = new ValoresPorDataResponseDTO(data, valores);
+
+        when(clienteRepository.findAllAtivos()).thenReturn(Collections.singletonList(cliente));
+        when(custodiasFeignClient.obterCustodiasPorClienteId(99L)).thenReturn(Collections.emptyList());
+        when(valoresFeignClient.obterValoresPorClienteEData(99L, data)).thenReturn(valoresPorData);
+        when(snapshotCarteiraRepository.saveAll(anyList())).thenAnswer(invocation -> {
+            List<SnapshotCarteira> snapshots = invocation.getArgument(0);
+            assertEquals(1, snapshots.size());
+            assertEquals(99L, snapshots.get(0).getClienteId());
+            assertEquals(data, snapshots.get(0).getDataSnapshot());
+            return snapshots;
+        });
+
+        // Act
+        carteiraService.gerarSnapshots(data);
+
+        // Assert
+        verify(snapshotCarteiraRepository).saveAll(anyList());
+    }
+
+    @Test
+    void deveCalcularValorInvestidoSubtraindoValorVendido() {
+        // Arrange
+        LocalDate data = LocalDate.of(2026, 2, 5);
+        Cliente cliente = new Cliente();
+        cliente.setId(1L);
+
+        List<CustodiaResponseDTO> custodias = Arrays.asList(
+                new CustodiaResponseDTO("PETR4", 100, new BigDecimal("30.00"), new BigDecimal("35.00"), "COMPRA")
+        );
+
+        // Valor investido: 10000 - 4000 = 6000
+        ValoresResponseDTO valores = new ValoresResponseDTO(new BigDecimal("10000.00"), new BigDecimal("4000.00"));
+        ValoresPorDataResponseDTO valoresPorData = new ValoresPorDataResponseDTO(data, valores);
+
+        when(clienteRepository.findAllAtivos()).thenReturn(Collections.singletonList(cliente));
+        when(custodiasFeignClient.obterCustodiasPorClienteId(1L)).thenReturn(custodias);
+        when(valoresFeignClient.obterValoresPorClienteEData(1L, data)).thenReturn(valoresPorData);
+        when(snapshotCarteiraRepository.saveAll(anyList())).thenAnswer(invocation -> {
+            List<SnapshotCarteira> snapshots = invocation.getArgument(0);
+            assertEquals(1, snapshots.size());
+            assertEquals(new BigDecimal("6000.00"), snapshots.get(0).getValorInvestido());
+            return snapshots;
+        });
+
+        // Act
+        carteiraService.gerarSnapshots(data);
+
+        // Assert
+        verify(snapshotCarteiraRepository).saveAll(anyList());
+    }
+
+    @Test
+    void deveRetornarValorCarteiraZeroQuandoNaoHouverCustodias() {
+        // Arrange
+        LocalDate data = LocalDate.of(2026, 2, 5);
+        Cliente cliente = new Cliente();
+        cliente.setId(1L);
+
+        ValoresResponseDTO valores = new ValoresResponseDTO(new BigDecimal("1000.00"), BigDecimal.ZERO);
+        ValoresPorDataResponseDTO valoresPorData = new ValoresPorDataResponseDTO(data, valores);
+
+        when(clienteRepository.findAllAtivos()).thenReturn(Collections.singletonList(cliente));
+        when(custodiasFeignClient.obterCustodiasPorClienteId(1L)).thenReturn(Collections.emptyList());
+        when(valoresFeignClient.obterValoresPorClienteEData(1L, data)).thenReturn(valoresPorData);
+        when(snapshotCarteiraRepository.saveAll(anyList())).thenAnswer(invocation -> {
+            List<SnapshotCarteira> snapshots = invocation.getArgument(0);
+            assertEquals(1, snapshots.size());
+            assertEquals(BigDecimal.ZERO, snapshots.get(0).getValorCarteira());
+            return snapshots;
+        });
+
+        // Act
+        carteiraService.gerarSnapshots(data);
+
+        // Assert
+        verify(snapshotCarteiraRepository).saveAll(anyList());
+    }
+
+    @Test
+    void deveNaoGerarSnapshotsQuandoNaoHouverClientesAtivos() {
+        // Arrange
+        LocalDate data = LocalDate.of(2026, 2, 5);
+        when(clienteRepository.findAllAtivos()).thenReturn(Collections.emptyList());
+        when(snapshotCarteiraRepository.saveAll(anyList())).thenAnswer(invocation -> {
+            List<SnapshotCarteira> snapshots = invocation.getArgument(0);
+            assertTrue(snapshots.isEmpty());
+            return snapshots;
+        });
+
+        // Act
+        carteiraService.gerarSnapshots(data);
+
+        // Assert
+        verify(clienteRepository).findAllAtivos();
+        verify(snapshotCarteiraRepository).saveAll(anyList());
+        verify(custodiasFeignClient, never()).obterCustodiasPorClienteId(anyLong());
+        verify(valoresFeignClient, never()).obterValoresPorClienteEData(anyLong(), any(LocalDate.class));
+    }
+
+    @Test
+    void deveChamarFeignClientParaCadaCliente() {
+        // Arrange
+        LocalDate data = LocalDate.of(2026, 2, 5);
+
+        Cliente cliente1 = new Cliente();
+        cliente1.setId(1L);
+
+        Cliente cliente2 = new Cliente();
+        cliente2.setId(2L);
+
+        List<Cliente> clientes = Arrays.asList(cliente1, cliente2);
+
+        ValoresResponseDTO valores = new ValoresResponseDTO(new BigDecimal("1000.00"), BigDecimal.ZERO);
+        ValoresPorDataResponseDTO valoresPorData = new ValoresPorDataResponseDTO(data, valores);
+
+        when(clienteRepository.findAllAtivos()).thenReturn(clientes);
+        when(custodiasFeignClient.obterCustodiasPorClienteId(anyLong())).thenReturn(Collections.emptyList());
+        when(valoresFeignClient.obterValoresPorClienteEData(anyLong(), eq(data))).thenReturn(valoresPorData);
+        when(snapshotCarteiraRepository.saveAll(anyList())).thenReturn(Collections.emptyList());
+
+        // Act
+        carteiraService.gerarSnapshots(data);
+
+        // Assert
+        verify(custodiasFeignClient, times(1)).obterCustodiasPorClienteId(1L);
+        verify(custodiasFeignClient, times(1)).obterCustodiasPorClienteId(2L);
+        verify(valoresFeignClient, times(1)).obterValoresPorClienteEData(1L, data);
+        verify(valoresFeignClient, times(1)).obterValoresPorClienteEData(2L, data);
+    }
+
+    @Test
+    void deveSalvarTodosSnapshotsDeUmaVez() {
+        // Arrange
+        LocalDate data = LocalDate.of(2026, 2, 5);
+
+        Cliente cliente1 = new Cliente();
+        cliente1.setId(1L);
+
+        Cliente cliente2 = new Cliente();
+        cliente2.setId(2L);
+
+        List<Cliente> clientes = Arrays.asList(cliente1, cliente2);
+
+        ValoresResponseDTO valores = new ValoresResponseDTO(new BigDecimal("1000.00"), BigDecimal.ZERO);
+        ValoresPorDataResponseDTO valoresPorData = new ValoresPorDataResponseDTO(data, valores);
+
+        when(clienteRepository.findAllAtivos()).thenReturn(clientes);
+        when(custodiasFeignClient.obterCustodiasPorClienteId(anyLong())).thenReturn(Collections.emptyList());
+        when(valoresFeignClient.obterValoresPorClienteEData(anyLong(), eq(data))).thenReturn(valoresPorData);
+        when(snapshotCarteiraRepository.saveAll(anyList())).thenReturn(Collections.emptyList());
+
+        // Act
+        carteiraService.gerarSnapshots(data);
+
+        // Assert
+        verify(snapshotCarteiraRepository, times(1)).saveAll(anyList());
+    }
+}

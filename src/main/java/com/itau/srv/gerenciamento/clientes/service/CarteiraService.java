@@ -5,14 +5,17 @@ import com.itau.srv.gerenciamento.clientes.dto.carteira.AtivoResponseDTO;
 import com.itau.srv.gerenciamento.clientes.dto.carteira.CarteiraResponseDTO;
 import com.itau.srv.gerenciamento.clientes.dto.carteira.ResumoResponseDTO;
 import com.itau.srv.gerenciamento.clientes.dto.custodia.CustodiaResponseDTO;
+import com.itau.srv.gerenciamento.clientes.dto.valor.ValoresPorDataResponseDTO;
 import com.itau.srv.gerenciamento.clientes.dto.valor.ValoresResponseDTO;
 import com.itau.srv.gerenciamento.clientes.feign.CustodiasFeignClient;
 import com.itau.srv.gerenciamento.clientes.feign.ValoresFeignClient;
 import com.itau.srv.gerenciamento.clientes.mapper.CarteiraMaper;
 import com.itau.srv.gerenciamento.clientes.model.Cliente;
 import com.itau.srv.gerenciamento.clientes.model.ContaGrafica;
+import com.itau.srv.gerenciamento.clientes.model.SnapshotCarteira;
 import com.itau.srv.gerenciamento.clientes.repository.ClienteRepository;
 import com.itau.srv.gerenciamento.clientes.repository.ContaGraficaRepository;
+import com.itau.srv.gerenciamento.clientes.repository.SnapshotCarteiraRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -20,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -33,6 +37,7 @@ public class CarteiraService {
     private final CustodiasFeignClient custodiasFeignClient;
     private final CarteiraMaper carteiraMaper;
     private final ValoresFeignClient valoresFeignClient;
+    private final SnapshotCarteiraRepository snapshotCarteiraRepository;
 
     @Transactional(readOnly = true)
     public CarteiraResponseDTO consultarCarteiraCliente(Long clienteId) {
@@ -110,5 +115,47 @@ public class CarteiraService {
         );
 
         return carteiraMaper.mapearParaCarteiraResponseDTO(cliente, contaGrafica, resumo, ativos);
+    }
+
+    @Transactional
+    public void gerarSnapshots(LocalDate data) {
+        List<SnapshotCarteira> snapshots = new ArrayList<>();
+
+        List<Cliente> clientes = clienteRepository.findAllAtivos();
+
+        for (Cliente cliente : clientes) {
+            SnapshotCarteira snapshot = new SnapshotCarteira();
+
+            snapshot.setClienteId(cliente.getId());
+            snapshot.setDataSnapshot(data);
+
+            List<CustodiaResponseDTO> custodiasCliente = custodiasFeignClient.obterCustodiasPorClienteId(cliente.getId());
+
+            BigDecimal valorAtualCarteira = custodiasCliente.isEmpty() ? BigDecimal.ZERO
+                    : custodiasCliente.stream()
+                    .map(c -> c.valorAtual().multiply(BigDecimal.valueOf(c.quantidade())))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            snapshot.setValorCarteira(valorAtualCarteira);
+
+            ValoresPorDataResponseDTO valores = valoresFeignClient.obterValoresPorClienteEData(cliente.getId(), data);
+
+            BigDecimal valorTotalInvestido = valores.valores().valorInvestido().subtract(valores.valores().valorVendido());
+
+            BigDecimal numerador = valorAtualCarteira.subtract(valorTotalInvestido);
+
+            BigDecimal rentabilidadePercentual = valorTotalInvestido.compareTo(BigDecimal.ZERO) == 0
+                    ? BigDecimal.ZERO
+                    : numerador.divide(valorTotalInvestido, 4, RoundingMode.DOWN).multiply(BigDecimal.valueOf(100)).setScale(2, RoundingMode.DOWN);
+
+            snapshot.setValorInvestido(valorTotalInvestido);
+            snapshot.setRentabilidade(rentabilidadePercentual);
+
+            snapshots.add(snapshot);
+        }
+
+        log.info("Salvando {} snapshots", snapshots.size());
+
+        snapshotCarteiraRepository.saveAll(snapshots);
     }
 }

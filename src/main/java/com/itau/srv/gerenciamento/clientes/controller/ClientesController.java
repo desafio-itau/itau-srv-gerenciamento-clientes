@@ -15,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 
@@ -76,5 +77,16 @@ public class ClientesController implements ControllerGenerico {
         log.info("Buscando carteira do cliente: {}", clienteId);
 
         return ResponseEntity.ok(carteiraService.consultarCarteiraCliente(clienteId));
+    }
+
+    @PostMapping("/carteiras-snapshots")
+    public ResponseEntity<Void> gerarSnapshotCarteira(@RequestParam LocalDate data) {
+        log.info("Gerando snapshot de carteiras de clientes para data: {}", data);
+
+        carteiraService.gerarSnapshots(data);
+
+        log.info("Snapshot de carteiras de clientes gerado com sucesso");
+
+        return ResponseEntity.noContent().build();
     }
 }

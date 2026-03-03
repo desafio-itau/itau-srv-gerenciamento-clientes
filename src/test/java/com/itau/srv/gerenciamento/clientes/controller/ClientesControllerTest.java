@@ -816,6 +816,148 @@ class ClientesControllerTest {
 
         verify(carteiraService).consultarCarteiraCliente(99L);
     }
+
+    // =========== TESTES PARA GERAR SNAPSHOT DE CARTEIRAS ===========
+
+    @Test
+    void deveGerarSnapshotDeCarteirasComSucesso() throws Exception {
+        // Arrange
+        String data = "2026-02-05";
+        doNothing().when(carteiraService).gerarSnapshots(any());
+
+        // Act & Assert
+        mockMvc.perform(post("/api/clientes/carteiras-snapshots")
+                        .param("data", data))
+                .andExpect(status().isNoContent());
+
+        verify(carteiraService).gerarSnapshots(any());
+    }
+
+    @Test
+    void deveChamarServiceParaGerarSnapshotComDataCorreta() throws Exception {
+        // Arrange
+        String data = "2026-02-15";
+        doNothing().when(carteiraService).gerarSnapshots(any());
+
+        // Act
+        mockMvc.perform(post("/api/clientes/carteiras-snapshots")
+                        .param("data", data))
+                .andExpect(status().isNoContent());
+
+        // Assert
+        verify(carteiraService, times(1)).gerarSnapshots(any());
+    }
+
+    @Test
+    void deveRetornar204AoGerarSnapshot() throws Exception {
+        // Arrange
+        String data = "2026-01-05";
+        doNothing().when(carteiraService).gerarSnapshots(any());
+
+        // Act & Assert
+        mockMvc.perform(post("/api/clientes/carteiras-snapshots")
+                        .param("data", data))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""));
+    }
+
+    // =========== TESTES PARA BUSCAR CLIENTES ATIVOS ===========
+
+    @Test
+    void deveBuscarClientesAtivosComSucesso() throws Exception {
+        // Arrange
+        ContaGraficaResponseDTO contaGrafica1 = new ContaGraficaResponseDTO(
+                1L,
+                "ITAUFL00001",
+                TipoConta.FILHOTE,
+                LocalDateTime.now()
+        );
+
+        ContaGraficaResponseDTO contaGrafica2 = new ContaGraficaResponseDTO(
+                2L,
+                "ITAUFL00002",
+                TipoConta.FILHOTE,
+                LocalDateTime.now()
+        );
+
+        AdesaoResponseDTO cliente1 = new AdesaoResponseDTO(
+                1L,
+                "João Silva",
+                "52998224725",
+                "joao@email.com",
+                new BigDecimal("150.00"),
+                true,
+                LocalDateTime.now(),
+                contaGrafica1
+        );
+
+        AdesaoResponseDTO cliente2 = new AdesaoResponseDTO(
+                2L,
+                "Maria Santos",
+                "12345678901",
+                "maria@email.com",
+                new BigDecimal("200.00"),
+                true,
+                LocalDateTime.now(),
+                contaGrafica2
+        );
+
+        when(clienteService.buscarClientesAtivos()).thenReturn(Arrays.asList(cliente1, cliente2));
+
+        // Act & Assert
+        mockMvc.perform(get("/api/clientes"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].clienteId").value(1))
+                .andExpect(jsonPath("$[0].nome").value("João Silva"))
+                .andExpect(jsonPath("$[0].cpf").value("52998224725"))
+                .andExpect(jsonPath("$[1].clienteId").value(2))
+                .andExpect(jsonPath("$[1].nome").value("Maria Santos"))
+                .andExpect(jsonPath("$[1].cpf").value("12345678901"));
+
+        verify(clienteService).buscarClientesAtivos();
+    }
+
+    @Test
+    void deveRetornarListaVaziaQuandoNaoHouverClientesAtivos() throws Exception {
+        // Arrange
+        when(clienteService.buscarClientesAtivos()).thenReturn(Collections.emptyList());
+
+        // Act & Assert
+        mockMvc.perform(get("/api/clientes"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.length()").value(0));
+
+        verify(clienteService).buscarClientesAtivos();
+    }
+
+    @Test
+    void deveChamarServiceParaBuscarClientesAtivos() throws Exception {
+        // Arrange
+        when(clienteService.buscarClientesAtivos()).thenReturn(Collections.emptyList());
+
+        // Act
+        mockMvc.perform(get("/api/clientes"))
+                .andExpect(status().isOk());
+
+        // Assert
+        verify(clienteService, times(1)).buscarClientesAtivos();
+    }
+
+    @Test
+    void deveRetornarContentTypeJSONAoBuscarClientesAtivos() throws Exception {
+        // Arrange
+        when(clienteService.buscarClientesAtivos()).thenReturn(Collections.emptyList());
+
+        // Act & Assert
+        mockMvc.perform(get("/api/clientes"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON));
+
+        verify(clienteService).buscarClientesAtivos();
+    }
 }
 
 
