@@ -5,10 +5,12 @@ import com.itau.srv.gerenciamento.clientes.dto.adesao.AdesaoCancelamentoResponse
 import com.itau.srv.gerenciamento.clientes.dto.adesao.AdesaoRequestDTO;
 import com.itau.srv.gerenciamento.clientes.dto.adesao.AdesaoResponseDTO;
 import com.itau.srv.gerenciamento.clientes.dto.carteira.CarteiraResponseDTO;
+import com.itau.srv.gerenciamento.clientes.dto.rentabilidade.RentabilidadeResponseDTO;
 import com.itau.srv.gerenciamento.clientes.dto.valormensal.AlterarValorMensalRequestDTO;
 import com.itau.srv.gerenciamento.clientes.dto.valormensal.AlterarValorMensalResponseDTO;
 import com.itau.srv.gerenciamento.clientes.service.CarteiraService;
 import com.itau.srv.gerenciamento.clientes.service.ClienteService;
+import com.itau.srv.gerenciamento.clientes.service.RentabilidadeService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +29,7 @@ public class ClientesController implements ControllerGenerico {
 
     private final ClienteService clienteService;
     private final CarteiraService carteiraService;
+    private final RentabilidadeService rentabilidadeService;
 
     @PostMapping("/adesao")
     public ResponseEntity<AdesaoResponseDTO> aderirAoProduto(@RequestBody @Valid AdesaoRequestDTO dto) {
@@ -88,5 +91,12 @@ public class ClientesController implements ControllerGenerico {
         log.info("Snapshot de carteiras de clientes gerado com sucesso");
 
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{clienteId}/rentabilidade")
+    public ResponseEntity<RentabilidadeResponseDTO> consultarRentabilidade(@PathVariable Long clienteId) {
+        log.info("Consultando rentabilidade detalhada do cliente: {}", clienteId);
+
+        return ResponseEntity.ok(rentabilidadeService.consultarRentabilidade(clienteId));
     }
 }

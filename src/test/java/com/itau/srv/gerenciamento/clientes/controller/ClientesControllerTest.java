@@ -10,9 +10,13 @@ import com.itau.srv.gerenciamento.clientes.dto.carteira.ResumoResponseDTO;
 import com.itau.srv.gerenciamento.clientes.dto.contagrafica.ContaGraficaResponseDTO;
 import com.itau.srv.gerenciamento.clientes.dto.valormensal.AlterarValorMensalRequestDTO;
 import com.itau.srv.gerenciamento.clientes.dto.valormensal.AlterarValorMensalResponseDTO;
+import com.itau.srv.gerenciamento.clientes.dto.rentabilidade.RentabilidadeResponseDTO;
+import com.itau.srv.gerenciamento.clientes.dto.rentabilidade.EvolucaoCarteiraResponseDTO;
+import com.itau.srv.gerenciamento.clientes.dto.rentabilidade.HistoricoAportesResponseDTO;
 import com.itau.srv.gerenciamento.clientes.model.enums.TipoConta;
 import com.itau.srv.gerenciamento.clientes.service.CarteiraService;
 import com.itau.srv.gerenciamento.clientes.service.ClienteService;
+import com.itau.srv.gerenciamento.clientes.service.RentabilidadeService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,6 +28,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collections;
@@ -41,6 +46,9 @@ class ClientesControllerTest {
 
     @Mock
     private CarteiraService carteiraService;
+
+    @Mock
+    private RentabilidadeService rentabilidadeService;
 
     @InjectMocks
     private ClientesController clientesController;
@@ -958,6 +966,222 @@ class ClientesControllerTest {
 
         verify(clienteService).buscarClientesAtivos();
     }
+
+    // ============= Testes para Gerar Snapshot de Carteira =============
+
+    @Test
+    void deveGerarSnapshotCarteiraComSucesso() throws Exception {
+        // Arrange
+        LocalDate data = LocalDate.of(2026, 3, 5);
+        doNothing().when(carteiraService).gerarSnapshots(any(LocalDate.class));
+
+        // Act & Assert
+        mockMvc.perform(post("/api/clientes/carteiras-snapshots")
+                        .param("data", "2026-03-05"))
+                .andExpect(status().isNoContent());
+
+        verify(carteiraService, times(1)).gerarSnapshots(data);
+    }
+
+    @Test
+    void deveChamarServiceParaGerarSnapshot() throws Exception {
+        // Arrange
+        LocalDate data = LocalDate.of(2026, 3, 1);
+        doNothing().when(carteiraService).gerarSnapshots(any(LocalDate.class));
+
+        // Act
+        mockMvc.perform(post("/api/clientes/carteiras-snapshots")
+                .param("data", "2026-03-01"));
+
+        // Assert
+        verify(carteiraService, times(1)).gerarSnapshots(data);
+    }
+
+    @Test
+    void deveAceitarParametroDataNaRequisicao() throws Exception {
+        // Arrange
+        doNothing().when(carteiraService).gerarSnapshots(any(LocalDate.class));
+
+        // Act & Assert
+        mockMvc.perform(post("/api/clientes/carteiras-snapshots")
+                        .param("data", "2026-02-15"))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void deveRetornarStatus204QuandoSnapshotGeradoComSucesso() throws Exception {
+        // Arrange
+        doNothing().when(carteiraService).gerarSnapshots(any(LocalDate.class));
+
+        // Act & Assert
+        mockMvc.perform(post("/api/clientes/carteiras-snapshots")
+                        .param("data", "2026-03-01"))
+                .andExpect(status().isNoContent());
+    }
+
+    // ============= Testes para Consultar Rentabilidade =============
+
+    @Test
+    void deveConsultarRentabilidadeComSucesso() throws Exception {
+        // Arrange
+        RentabilidadeResponseDTO rentabilidadeResponse = criarRentabilidadeResponseMock();
+        when(rentabilidadeService.consultarRentabilidade(anyLong())).thenReturn(rentabilidadeResponse);
+
+        // Act & Assert
+        mockMvc.perform(get("/api/clientes/1/rentabilidade"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.clienteId").value(1))
+                .andExpect(jsonPath("$.nome").value("João Silva"))
+                .andExpect(jsonPath("$.rentabilidade").exists())
+                .andExpect(jsonPath("$.historicoAportes").isArray())
+                .andExpect(jsonPath("$.evolucaoCarteira").isArray());
+
+        verify(rentabilidadeService, times(1)).consultarRentabilidade(1L);
+    }
+
+    @Test
+    void deveChamarServiceParaConsultarRentabilidade() throws Exception {
+        // Arrange
+        RentabilidadeResponseDTO rentabilidadeResponse = criarRentabilidadeResponseMock();
+        when(rentabilidadeService.consultarRentabilidade(anyLong())).thenReturn(rentabilidadeResponse);
+
+        // Act
+        mockMvc.perform(get("/api/clientes/1/rentabilidade"));
+
+        // Assert
+        verify(rentabilidadeService, times(1)).consultarRentabilidade(1L);
+    }
+
+    @Test
+    void deveRetornarDadosDeRentabilidadeNaResposta() throws Exception {
+        // Arrange
+        RentabilidadeResponseDTO rentabilidadeResponse = criarRentabilidadeResponseMock();
+        when(rentabilidadeService.consultarRentabilidade(anyLong())).thenReturn(rentabilidadeResponse);
+
+        // Act & Assert
+        mockMvc.perform(get("/api/clientes/1/rentabilidade"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rentabilidade.valorTotalInvestido").value(3000.00))
+                .andExpect(jsonPath("$.rentabilidade.valorAtualCarteira").value(3300.00))
+                .andExpect(jsonPath("$.rentabilidade.plTotal").value(300.00))
+                .andExpect(jsonPath("$.rentabilidade.rentabilidadePercentual").value(10.00));
+    }
+
+    @Test
+    void deveRetornarHistoricoAportesNaResposta() throws Exception {
+        // Arrange
+        RentabilidadeResponseDTO rentabilidadeResponse = criarRentabilidadeResponseMock();
+        when(rentabilidadeService.consultarRentabilidade(anyLong())).thenReturn(rentabilidadeResponse);
+
+        // Act & Assert
+        mockMvc.perform(get("/api/clientes/1/rentabilidade"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.historicoAportes").isArray())
+                .andExpect(jsonPath("$.historicoAportes.length()").value(3))
+                .andExpect(jsonPath("$.historicoAportes[0].data").isArray())
+                .andExpect(jsonPath("$.historicoAportes[0].valor").value(1000.00))
+                .andExpect(jsonPath("$.historicoAportes[0].parcela").value("1/12"));
+    }
+
+    @Test
+    void deveRetornarEvolucaoCarteiraNaResposta() throws Exception {
+        // Arrange
+        RentabilidadeResponseDTO rentabilidadeResponse = criarRentabilidadeResponseMock();
+        when(rentabilidadeService.consultarRentabilidade(anyLong())).thenReturn(rentabilidadeResponse);
+
+        // Act & Assert
+        mockMvc.perform(get("/api/clientes/1/rentabilidade"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.evolucaoCarteira").isArray())
+                .andExpect(jsonPath("$.evolucaoCarteira.length()").value(3))
+                .andExpect(jsonPath("$.evolucaoCarteira[0].data").isArray())
+                .andExpect(jsonPath("$.evolucaoCarteira[0].valorCarteira").value(1000.00))
+                .andExpect(jsonPath("$.evolucaoCarteira[0].valorInvestido").value(1000.00))
+                .andExpect(jsonPath("$.evolucaoCarteira[0].rentabilidade").value(0.00));
+    }
+
+    @Test
+    void deveRetornarContentTypeJSONAoConsultarRentabilidade() throws Exception {
+        // Arrange
+        RentabilidadeResponseDTO rentabilidadeResponse = criarRentabilidadeResponseMock();
+        when(rentabilidadeService.consultarRentabilidade(anyLong())).thenReturn(rentabilidadeResponse);
+
+        // Act & Assert
+        mockMvc.perform(get("/api/clientes/1/rentabilidade"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON));
+    }
+
+    @Test
+    void deveUsarPathVariableClienteIdParaConsultarRentabilidade() throws Exception {
+        // Arrange
+        RentabilidadeResponseDTO rentabilidadeResponse = criarRentabilidadeResponseMock();
+        when(rentabilidadeService.consultarRentabilidade(anyLong())).thenReturn(rentabilidadeResponse);
+
+        // Act
+        mockMvc.perform(get("/api/clientes/5/rentabilidade"))
+                .andExpect(status().isOk());
+
+        // Assert
+        verify(rentabilidadeService, times(1)).consultarRentabilidade(5L);
+    }
+
+    // ============= Métodos auxiliares =============
+
+    private RentabilidadeResponseDTO criarRentabilidadeResponseMock() {
+        ResumoResponseDTO resumo = new ResumoResponseDTO(
+                new BigDecimal("3000.00"),  // valorTotalInvestido
+                new BigDecimal("3300.00"),  // valorAtualCarteira
+                new BigDecimal("300.00"),   // plTotal
+                new BigDecimal("10.00")     // rentabilidadePercentual
+        );
+
+        HistoricoAportesResponseDTO aporte1 = new HistoricoAportesResponseDTO(
+                LocalDate.of(2026, 1, 5),
+                new BigDecimal("1000.00"),
+                "1/12"
+        );
+
+        HistoricoAportesResponseDTO aporte2 = new HistoricoAportesResponseDTO(
+                LocalDate.of(2026, 2, 5),
+                new BigDecimal("1000.00"),
+                "2/12"
+        );
+
+        HistoricoAportesResponseDTO aporte3 = new HistoricoAportesResponseDTO(
+                LocalDate.of(2026, 3, 5),
+                new BigDecimal("1000.00"),
+                "3/12"
+        );
+
+        EvolucaoCarteiraResponseDTO evolucao1 = new EvolucaoCarteiraResponseDTO(
+                LocalDate.of(2026, 1, 5),
+                new BigDecimal("1000.00"),
+                new BigDecimal("1000.00"),
+                BigDecimal.ZERO
+        );
+
+        EvolucaoCarteiraResponseDTO evolucao2 = new EvolucaoCarteiraResponseDTO(
+                LocalDate.of(2026, 2, 5),
+                new BigDecimal("2100.00"),
+                new BigDecimal("2000.00"),
+                new BigDecimal("5.00")
+        );
+
+        EvolucaoCarteiraResponseDTO evolucao3 = new EvolucaoCarteiraResponseDTO(
+                LocalDate.of(2026, 3, 5),
+                new BigDecimal("3300.00"),
+                new BigDecimal("3000.00"),
+                new BigDecimal("10.00")
+        );
+
+        return new RentabilidadeResponseDTO(
+                1L,
+                "João Silva",
+                LocalDateTime.now(),
+                resumo,
+                Arrays.asList(aporte1, aporte2, aporte3),
+                Arrays.asList(evolucao1, evolucao2, evolucao3)
+        );
+    }
 }
-
-
