@@ -1,5 +1,7 @@
 package com.itau.srv.gerenciamento.clientes.service;
 
+import com.itau.srv.gerenciamento.clientes.dto.contagrafica.ContaGraficaResponseDTO;
+import com.itau.srv.gerenciamento.clientes.mapper.ContaGraficaMapper;
 import com.itau.srv.gerenciamento.clientes.model.Cliente;
 import com.itau.srv.gerenciamento.clientes.model.ContaGrafica;
 import com.itau.srv.gerenciamento.clientes.model.enums.TipoConta;
@@ -15,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ContaGraficaService {
 
     private final ContaGraficaRepository contaGraficaRepository;
+    private final ContaGraficaMapper contaGraficaMapper;
 
     private static final String PREFIXO_CONTA = "ITAUFL";
     private static final int TAMANHO_NUMERO = 5;
@@ -34,6 +37,17 @@ public class ContaGraficaService {
         log.info("Conta grafica criada com sucesso: {}", contaGrafica.getNumeroConta());
 
         return contaGraficaRepository.save(contaGrafica);
+    }
+
+    @Transactional(readOnly = true)
+    public ContaGraficaResponseDTO buscarConta(Long id) {
+        ContaGrafica contaGrafica = contaGraficaRepository.findById(id)
+                .orElseThrow(() -> {
+                    log.error("Conta grafica não encontrada com ID: {}", id);
+                    return new RuntimeException("Conta grafica não encontrada");
+                });
+
+        return contaGraficaMapper.mapearParaContaGraficaResponseDTO(contaGrafica);
     }
 
     private String gerarNumeroConta(Long id) {

@@ -45,7 +45,7 @@
 		<java.version>17</java.version>
 		<spring-cloud.version>2024.0.0</spring-cloud.version>
 		<jacoco-maven-plugin.version>0.8.12</jacoco-maven-plugin.version>
-		<jacoco.coverage.exclusions>com/itau/srv/gerenciamento/clientes/exception/**,com/itau/srv/gerenciamento/clientes/model/**,com/itau/srv/gerenciamento/clientes/repository/**,com/itau/srv/gerenciamento/clientes/dto/**,com/itau/srv/gerenciamento/clientes/annotation/**,com/itau/srv/gerenciamento/clientes/GerenciamentoClientesApplication.class</jacoco.coverage.exclusions>
+		<jacoco.coverage.exclusions>com/itau/srv/gerenciamento/clientes/feign/**,com/itau/srv/gerenciamento/clientes/exception/**,com/itau/srv/gerenciamento/clientes/model/**,com/itau/srv/gerenciamento/clientes/repository/**,com/itau/srv/gerenciamento/clientes/dto/**,com/itau/srv/gerenciamento/clientes/annotation/**,com/itau/srv/gerenciamento/clientes/GerenciamentoClientesApplication.class</jacoco.coverage.exclusions>
 	</properties>
 	<dependencyManagement>
 		<dependencies>
